@@ -29,9 +29,6 @@ Windows 10 / 11 中文桌面工具：账号、密码、连接、重试、取消�
 登录接口 http://172.16.253.3:801/eportal/?c=Portal&a=login 。
 每次读取页面中的实时 IP，不把制作时的 IP 固定保存。
 
-已验证：21 项协议、客户端和凭据存储测试，9 组原生界面交互测试，以及本地 HTTP 服务器响应体停滞时的真实取消测试；已检查原生窗口渲染。
-已只读访问当前学校认证页。**尚未输入真实账号密码进行校园网登录验收**，最终需要由你在校园网环境点击连接确认。
-
 ## 数据处理
 
 账号密码不会写入日志。勾选“记住账号和密码”后，密文保存在 `%LOCALAPPDATA%\AHU Campus Helper\credentials.dat`，由 Windows DPAPI 绑定当前 Windows 用户；取消勾选或点击清除即可删除。登录遵循学校现有 HTTP 接口；登录请求不自动跟随重定向。
@@ -55,4 +52,4 @@ Windows PowerShell 中执行：
 - [C01in-0/AHU_AutoLogin](https://github.com/C01in-0/AHU_AutoLogin)：安徽大学 Dr.COM / ePortal 登录接口说明。
 - [Biubush/AutoNet4AHU](https://github.com/Biubush/AutoNet4AHU)：安徽大学图形界面登录工具及认证参数示例。
 
-参考日期：2026-09-14。
+参考日期：2026-09-14
