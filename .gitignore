@@ -1,0 +1,8 @@
+dist/
+test-results/
+*.exe
+*.pdb
+*.log
+*.tmp
+credentials.dat
+settings.json

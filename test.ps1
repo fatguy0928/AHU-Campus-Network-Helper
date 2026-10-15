@@ -14,6 +14,10 @@ if($LASTEXITCODE -ne 0) {throw 'Protocol tests failed'}
 if($LASTEXITCODE -ne 0) {throw 'UI test compilation failed'}
 & (Join-Path $testOut 'UiTests.exe') (Join-Path $testOut 'ui-preview.png')
 if($LASTEXITCODE -ne 0) {throw 'UI tests failed'}
+& $compiler /nologo /target:exe /codepage:65001 /main:StartupUiTests "/win32manifest:$PSScriptRoot/app.manifest" "/win32icon:$PSScriptRoot/assets/ahu.ico" "/out:$testOut/StartupUiTests.exe" @references @sources @tests
+if($LASTEXITCODE -ne 0) {throw 'Startup UI test compilation failed'}
+& (Join-Path $testOut 'StartupUiTests.exe')
+if($LASTEXITCODE -ne 0) {throw 'Startup UI tests failed'}
 & $compiler /nologo /target:exe /codepage:65001 /main:TransportTests "/out:$testOut/TransportTests.exe" @references @sources @tests
 if($LASTEXITCODE -ne 0) {throw 'Transport test compilation failed'}
 & (Join-Path $testOut 'TransportTests.exe')
