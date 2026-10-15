@@ -12,24 +12,37 @@ namespace AhuCampus
     {
         readonly PortalClient client;
         readonly CredentialStore credentialStore;
+        readonly IAppSettingsStore settingsStore;
+        readonly IStartupRegistration startupRegistration;
         readonly Color ink=Color.FromArgb(27,42,65);
         readonly Color muted=Color.FromArgb(103,116,132);
         readonly Color teal=Color.FromArgb(0,112,108);
         TextBox account, password, log;
         Button connect,retry,cancel;
         Label status,detail;
-        CheckBox show,remember;
+        CheckBox show,remember,startWithWindows,autoConnectOnLaunch;
         LinkLabel clearSaved;
         CancellationTokenSource pending;
         bool changingRemember;
         bool retryAvailable;
+        bool changingStartupOptions;
+        bool savedAutoConnect;
+        bool savedStartWithWindows;
+        bool startupHandled;
+        bool closing;
+        SavedCredentials startupCredentials;
 
         public MainForm(PortalClient client) : this(client,CredentialStore.CreateDefault()) { }
 
         public MainForm(PortalClient client,CredentialStore credentialStore)
+            : this(client,credentialStore,AppSettingsStore.CreateDefault(),new WindowsStartupRegistration(Application.ExecutablePath)) { }
+
+        public MainForm(PortalClient client,CredentialStore credentialStore,IAppSettingsStore settingsStore,IStartupRegistration startupRegistration)
         {
             this.client=client;
             this.credentialStore=credentialStore;
+            this.settingsStore=settingsStore;
+            this.startupRegistration=startupRegistration;
             Text="安徽大学 · 校园网助手";
             Name="MainForm";
             Font=new Font("Microsoft YaHei UI",10F);
@@ -37,8 +50,8 @@ namespace AhuCampus
             ForeColor=ink;
             AutoScaleDimensions=new SizeF(96F,96F);
             AutoScaleMode=AutoScaleMode.Dpi;
-            ClientSize=new Size(560,650);
-            MinimumSize=new Size(576,689);
+            ClientSize=new Size(560,708);
+            MinimumSize=new Size(576,747);
             MaximumSize=new Size(760,900);
             StartPosition=FormStartPosition.CenterScreen;
             Icon=LoadApplicationIcon();
@@ -46,7 +59,7 @@ namespace AhuCampus
             var root=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Padding=new Padding(24),BackColor=BackColor};
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute,99));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute,246));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute,304));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute,93));
             root.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             Controls.Add(root);
@@ -59,9 +72,9 @@ namespace AhuCampus
             caption.ForeColor=muted; caption.SetBounds(1,71,495,25);
             header.Controls.AddRange(new Control[]{tag,title,caption}); root.Controls.Add(header,0,0);
 
-            var card=new TableLayoutPanel {Dock=DockStyle.Fill,BackColor=Color.White,Padding=new Padding(18,12,18,12),ColumnCount=1,RowCount=6,Margin=new Padding(0,8,0,8)};
+            var card=new TableLayoutPanel {Dock=DockStyle.Fill,BackColor=Color.White,Padding=new Padding(18,12,18,12),ColumnCount=1,RowCount=8,Margin=new Padding(0,8,0,8)};
             card.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-            foreach (int height in new[]{25,37,25,37,29,49}) card.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
+            foreach (int height in new[]{25,37,25,37,29,30,28,49}) card.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
             card.Controls.Add(Label("账号",10,FontStyle.Bold),0,0);
             account=new TextBox {Name="Account",AccessibleName="校园网账号",Dock=DockStyle.Fill,Font=new Font(Font.FontFamily,12),MaxLength=128,Margin=new Padding(0,1,0,3)};
             card.Controls.Add(account,0,1);
@@ -80,6 +93,17 @@ namespace AhuCampus
             credentialOptions.Controls.AddRange(new Control[]{show,remember,clearSaved});
             card.Controls.Add(credentialOptions,0,4);
 
+            var startupOptions=new FlowLayoutPanel {Dock=DockStyle.Fill,AutoSize=false,FlowDirection=FlowDirection.LeftToRight,WrapContents=false,Margin=new Padding(0)};
+            startWithWindows=new CheckBox {Name="StartWithWindows",Text="开机自启动",AutoSize=true,Margin=new Padding(0,3,22,0),ForeColor=muted};
+            autoConnectOnLaunch=new CheckBox {Name="AutoConnectOnLaunch",Text="启动软件后自动连接",AutoSize=true,Margin=new Padding(0,3,0,0),ForeColor=muted};
+            startWithWindows.CheckedChanged+=delegate {SaveWindowsStartup();};
+            autoConnectOnLaunch.CheckedChanged+=delegate {SaveAutoConnect();};
+            startupOptions.Controls.AddRange(new Control[]{startWithWindows,autoConnectOnLaunch});
+            card.Controls.Add(startupOptions,0,5);
+            var startupHint=Label("自动连接需先记住账号密码；每次启动只尝试一次。",8.5F,FontStyle.Regular);
+            startupHint.Dock=DockStyle.Fill; startupHint.ForeColor=muted;
+            card.Controls.Add(startupHint,0,6);
+
             var buttons=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Margin=new Padding(0,5,0,0)};
             buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,54));
             buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,25));
@@ -94,7 +118,7 @@ namespace AhuCampus
             account.TextChanged+=delegate {CredentialsEdited();};
             password.TextChanged+=delegate {CredentialsEdited();};
             buttons.Controls.Add(connect,0,0); buttons.Controls.Add(retry,1,0); buttons.Controls.Add(cancel,2,0);
-            card.Controls.Add(buttons,0,5); root.Controls.Add(card,0,1);
+            card.Controls.Add(buttons,0,7); root.Controls.Add(card,0,1);
             AcceptButton=connect;
 
             var stateBox=new Panel {Dock=DockStyle.Fill,BackColor=Color.FromArgb(231,240,242),Padding=new Padding(14),Margin=new Padding(0,3,0,10)};
@@ -116,9 +140,96 @@ namespace AhuCampus
             bottom.Controls.Add(link,0,2);
             var note=Label("勾选“记住”后，凭据由 Windows 为当前用户加密保存。",8.5F,FontStyle.Regular); note.ForeColor=muted;
             bottom.Controls.Add(note,0,3); root.Controls.Add(bottom,0,3);
-            FormClosing+=delegate {if(pending!=null) pending.Cancel(); password.Clear();};
+            FormClosing+=delegate {closing=true;startupCredentials=null;if(pending!=null) pending.Cancel(); password.Clear();};
             LoadSavedCredentials();
-            Shown+=delegate {if(account.TextLength==0) account.Focus(); else connect.Focus();};
+            LoadStartupOptions();
+            Shown+=async delegate {await RunStartupConnectionAsync();};
+        }
+
+        void LoadStartupOptions()
+        {
+            changingStartupOptions=true;
+            try
+            {
+                try {savedStartWithWindows=startupRegistration.IsEnabled;}
+                catch(Exception e)
+                {
+                    if(!IsSettingsError(e)) throw;
+                    AddLog("无法读取开机自启动设置，可以继续手动连接。");
+                }
+                try {savedAutoConnect=settingsStore.LoadAutoConnect();}
+                catch(Exception e)
+                {
+                    if(!IsSettingsError(e)) throw;
+                    AddLog("无法读取自动连接设置，本次按关闭处理。");
+                }
+                startWithWindows.Checked=savedStartWithWindows;
+                autoConnectOnLaunch.Checked=savedAutoConnect;
+            }
+            finally {changingStartupOptions=false;}
+        }
+
+        static bool IsSettingsError(Exception error)
+        {
+            return error is System.IO.IOException || error is UnauthorizedAccessException
+                || error is System.Security.SecurityException;
+        }
+
+        void SaveWindowsStartup()
+        {
+            if(changingStartupOptions) return;
+            try
+            {
+                startupRegistration.SetEnabled(startWithWindows.Checked);
+                savedStartWithWindows=startWithWindows.Checked;
+                AddLog(savedStartWithWindows ? "已开启开机自启动，将在当前 Windows 用户登录后打开软件。" : "已关闭开机自启动。");
+            }
+            catch(Exception e)
+            {
+                if(!IsSettingsError(e)) throw;
+                changingStartupOptions=true;
+                try {startWithWindows.Checked=savedStartWithWindows;}
+                finally {changingStartupOptions=false;}
+                AddLog("无法更改开机自启动设置，请检查当前用户权限；选项已恢复。");
+            }
+        }
+
+        void SaveAutoConnect()
+        {
+            if(changingStartupOptions) return;
+            try
+            {
+                settingsStore.SaveAutoConnect(autoConnectOnLaunch.Checked);
+                savedAutoConnect=autoConnectOnLaunch.Checked;
+                AddLog(savedAutoConnect ? "已开启启动后自动连接，下次启动生效。请先记住账号密码并连接一次。" : "已关闭启动后自动连接。");
+            }
+            catch(Exception e)
+            {
+                if(!IsSettingsError(e)) throw;
+                changingStartupOptions=true;
+                try {autoConnectOnLaunch.Checked=savedAutoConnect;}
+                finally {changingStartupOptions=false;}
+                AddLog("无法保存自动连接设置，请检查文件权限；选项已恢复。");
+            }
+        }
+
+        async Task RunStartupConnectionAsync()
+        {
+            if(startupHandled) return;
+            startupHandled=true;
+            await Task.Yield();
+            if(closing || IsDisposed || Disposing || pending!=null) return;
+            if(account.TextLength==0) account.Focus(); else connect.Focus();
+            if(!autoConnectOnLaunch.Checked) return;
+            if(!remember.Checked || startupCredentials==null
+                || account.Text.Trim()!=startupCredentials.Account || password.Text!=startupCredentials.Password)
+            {
+                SetStatus("自动连接未执行","请先勾选“记住账号和密码”并连接一次，下次启动即可自动连接。",false);
+                AddLog("没有可用的已保存账号密码，已跳过自动连接。");
+                return;
+            }
+            AddLog("正在使用已保存的账号密码执行启动后自动连接。");
+            await ConnectAsync(false);
         }
 
         Label Label(string text,float size,FontStyle style)
@@ -205,7 +316,7 @@ namespace AhuCampus
         }
         void SetBusy(bool busy,bool retrying)
         {
-            account.Enabled=password.Enabled=show.Enabled=remember.Enabled=clearSaved.Enabled=!busy;
+            account.Enabled=password.Enabled=show.Enabled=remember.Enabled=clearSaved.Enabled=autoConnectOnLaunch.Enabled=!busy;
             cancel.Enabled=busy;
             connect.Text=busy && !retrying?"连接中…":"连接";
             retry.Text=busy && retrying?"重试中…":"重试";
@@ -253,6 +364,7 @@ namespace AhuCampus
             account.Text=saved.Account;
             password.Text=saved.Password;
             remember.Checked=true;
+            startupCredentials=saved;
             detail.Text="已加载保存的账号密码，可以直接连接。";
         }
         void ClearSavedCredentials(bool clearFields)
@@ -260,6 +372,7 @@ namespace AhuCampus
             try {credentialStore.Clear();}
             catch(System.IO.IOException) {AddLog("无法删除已保存信息，请关闭其他占用程序后重试。"); return;}
             catch(UnauthorizedAccessException) {AddLog("无法删除已保存信息，请检查文件权限。"); return;}
+            startupCredentials=null;
             if(remember.Checked)
             {
                 changingRemember=true;

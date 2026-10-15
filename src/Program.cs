@@ -4,8 +4,8 @@ using System.Windows.Forms;
 
 [assembly: AssemblyTitle("安徽大学校园网助手")]
 [assembly: AssemblyDescription("安徽大学校园网连接与重试工具")]
-[assembly: AssemblyVersion("1.2.1.0")]
-[assembly: AssemblyFileVersion("1.2.1.0")]
+[assembly: AssemblyVersion("1.3.0.0")]
+[assembly: AssemblyFileVersion("1.3.0.0")]
 namespace AhuCampus
 {
     public static class Program
