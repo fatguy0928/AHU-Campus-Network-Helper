@@ -47,5 +47,5 @@ public static class ProtocolTests
             Assert(!s.Contains("abc123") && !s.Contains("s&+密") && s.IndexOf("%E5",StringComparison.OrdinalIgnoreCase)<0);
         });
     }
-    public static int Main() { Run(); ClientTests.Run(); CredentialTests.Run(); Console.WriteLine("Failures: " + failed); return failed == 0 ? 0 : 1; }
+    public static int Main() { Run(); ClientTests.Run(); CredentialTests.Run(); StartupSettingsTests.Run(); Console.WriteLine("Failures: " + failed); return failed == 0 ? 0 : 1; }
 }

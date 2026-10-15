@@ -42,7 +42,8 @@ public static class UiTests
         var store=new CredentialStore(credentialPath,new UiProtector());
         store.Save("loaded-user","loaded-secret");
         int routeReads=0;
-        using(var form=new MainForm(new PortalClient(fake,delegate {routeReads++; return "10.22.8.10";}),store))
+        using(var form=new MainForm(new PortalClient(fake,delegate {routeReads++; return "10.22.8.10";}),store,
+            new AppSettingsStore(Path.Combine(credentialDir,"settings.json")),new StartupUiTests.FakeStartup()))
         {
             form.StartPosition=FormStartPosition.Manual; form.Location=new Point(-2400,-2400); form.ShowInTaskbar=false;
             form.Shown+=async delegate {
@@ -53,6 +54,9 @@ public static class UiTests
                     var account=Find<TextBox>(form,"Account"); var pass=Find<TextBox>(form,"Password");
                     var connect=Find<Button>(form,"Connect"); var retry=Find<Button>(form,"Retry"); var cancel=Find<Button>(form,"Cancel");
                     var status=Find<Label>(form,"Status");
+                    Assert(form.Controls.Find("StartWithWindows",true).Length==1
+                        && form.Controls.Find("AutoConnectOnLaunch",true).Length==1,
+                        "Both startup options must be available in the main window");
                     Assert(connect.Enabled && !retry.Enabled,"Retry must be unavailable before a failed connection attempt");
                     Console.WriteLine("PASS retry starts unavailable");
                     using(var embedded=Icon.ExtractAssociatedIcon(Application.ExecutablePath))
